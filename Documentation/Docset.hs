@@ -2,8 +2,8 @@ module Documentation.Docset
        ( Docset()
        , DocsetInfo()
        , DocsetEntry()
-       , openDocset
-       , closeDocset
+       , open
+       , close
        , docsetInfo
        , docsetBaseDir
        , docsetEntries
@@ -42,20 +42,26 @@ data DocsetEntry
     , entryType :: EntryType
     } deriving (Eq, Show)
 
-openDocset :: FilePath -> IO Docset
-openDocset basedir = do
+-- | The 'open' opens a docset located at given directory.
+open :: FilePath -> IO Docset
+open basedir = do
   info <- parseInfoFile $ getInfoFilePath basedir
   conn <- Sql3.connectSqlite3 $ getDbPath basedir
   kind <- detectDbLayout conn
   return $ Docset basedir info conn kind
 
-closeDocset :: Docset -> IO ()
-closeDocset = DB.disconnect . connection
+-- | The 'close' function closes a docset.
+close :: Docset -> IO ()
+close = DB.disconnect . connection
 
+-- | The 'entryFullPath' function returns full path
+--   to the docset entry.
 entryFullPath :: Docset -> DocsetEntry -> FilePath
 entryFullPath ds e
   = documentPath (docsetBaseDir ds) (T.unpack $ entryPath e)
 
+-- | The 'countEntries' returns count of entries in a docset.
+--   It uses strict evaluation.
 countEntries :: Docset -> IO Integer
 countEntries ds = do
   let conn = connection ds
@@ -63,10 +69,15 @@ countEntries ds = do
   [[n]] <- DB.quickQuery' conn query []
   return $ DB.fromSql n
 
+-- | The 'docsetEntries' function returns a lazy list of entries of a
+-- docset. The list must be read fully before the docset could be
+-- closed.
 docsetEntries :: Docset -> IO [DocsetEntry]
 docsetEntries ds
   = runQuery ds allQuery []
 
+-- | The 'entriesForPattern' function searches for entries
+-- with names matching the given sql-style pattern.
 entriesForPattern :: Docset -> String -> IO [DocsetEntry]
 entriesForPattern ds pattern
   = runQuery ds likeQuery [DB.toSql pattern]
